@@ -10,7 +10,6 @@ template <typename k_type, typename v_type,
 class bst{
 
   OP op = OP{};
-  //static constexpr OP op = OP{};
   
   struct node{
     std::pair<k_type,v_type> pair;
@@ -66,9 +65,27 @@ public:
   }
 
   // define begin iterators
-  iterator begin() noexcept { return iterator{_b()};}
-  const_iterator begin() const noexcept { return const_iterator{_b()};}
-  const_iterator cbegin() const noexcept { return const_iterator{_b()};} 
+  iterator begin() noexcept { 
+    auto tmp = head.get();
+    while (tmp->left)
+      tmp = tmp->left.get();
+    return iterator{tmp};
+    }
+  
+
+  const_iterator begin() const noexcept { 
+    auto tmp = head.get();
+    while (tmp->left)
+      tmp = tmp->left.get();
+    return const_iterator{tmp};  
+    }
+
+  const_iterator cbegin() const noexcept {
+    auto tmp = head.get();
+    while (tmp->left)
+      tmp = tmp->left.get();
+    return const_iterator{tmp};  
+    }
 
   // define end iterators
   iterator end() noexcept { return iterator{nullptr}; }
@@ -87,9 +104,25 @@ public:
     return tmp; 
   }
 
-  iterator last() noexcept { return iterator{_last()};}
-  const_iterator last() const noexcept { return const_iterator{_last()};}
-  const_iterator clast() const noexcept { return const_iterator{_last()};} 
+  iterator last() noexcept {
+    auto tmp = head.get();
+    while (tmp->right)
+      tmp = tmp->right.get();
+    return iterator{tmp}; 
+  }
+
+  const_iterator last() const noexcept {
+    auto tmp = head.get();
+    while (tmp->right)
+      tmp = tmp->right.get();
+    return const_iterator{tmp}; 
+  }
+  const_iterator clast() const noexcept {
+    auto tmp = head.get();
+    while (tmp->right)
+      tmp = tmp->right.get();
+    return const_iterator{tmp}; 
+  }
 
 // ===============================================================
 //   insert
@@ -112,11 +145,10 @@ public:
     }
     
     auto pos = end();
-    auto l = end();
     auto i = begin();
     
     // loop over the nodes
-    while(i != l) {
+    while(&(*i) != &(*end())) {
       
       // check if there is already such a key, and return in case 
       if (!op(v.first, i->pair.first) && !op(i->pair.first, v.first)){
@@ -198,29 +230,27 @@ public:
 
   iterator find(const k_type& x) noexcept {   
     auto first = begin();
-    auto e = end();
-    while(first != e) {
+    while(&(*first) != &(*end())) {
       if (first->pair.first == x) {
         return first;
       }
       ++first;
     }
     // if not found
-    return e;
+    return end();
   }
 
 
   const_iterator find(const k_type& x) const noexcept {   
     auto first = begin();
-    auto e = end();
-    while(first != e) {
+    while(&(*first) != &(*end())) {
       if (first->pair.first == x) {
         return first;
       }
       ++first;
     }
     // if not found
-    return e;
+    return end();
   }
 
 // ===============================================================
@@ -296,9 +326,8 @@ public:
      std::cout << "no such value is present" << std::endl;
      return;}
    auto successor = to_remove;
-   auto l = last();
    bool back=0;
-   if (&(*successor) == &(*l))
+   if (&(*successor) == &(*last()))
      back=1;
    // search for a leaf -> no right or left child 
    while (successor->right || successor->left){
@@ -366,9 +395,8 @@ public:
   
   //subscripting operator
   v_type& operator[](const k_type& x) noexcept  {
-    auto e = end();
     auto it = find(x);
-    if ( it == e){
+    if ( &(*it) == &(*end())){
       v_type v = "inserted new value (iwso)";// inserted with subscripting operator
       emplace(x,v);
       it = find(x);
@@ -380,9 +408,8 @@ public:
   
   //subscripting operator
   v_type& operator[](k_type&& x) noexcept {
-    auto e = end();
     auto it = find(std::move(x));
-    if ( it == e){
+    if ( &(*it) == &(*end())){
       v_type v = "inserted new value (iwso)";// inserted with subscripting operator
       emplace(std::move(x),v);
       it = find(std::move(x));
