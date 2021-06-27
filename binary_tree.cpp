@@ -65,27 +65,9 @@ public:
   }
 
   // define begin iterators
-  iterator begin() noexcept { 
-    auto tmp = head.get();
-    while (tmp->left)
-      tmp = tmp->left.get();
-    return iterator{tmp};
-    }
-  
-
-  const_iterator begin() const noexcept { 
-    auto tmp = head.get();
-    while (tmp->left)
-      tmp = tmp->left.get();
-    return const_iterator{tmp};  
-    }
-
-  const_iterator cbegin() const noexcept {
-    auto tmp = head.get();
-    while (tmp->left)
-      tmp = tmp->left.get();
-    return const_iterator{tmp};  
-    }
+  iterator begin() noexcept { return iterator{_b()};}
+  const_iterator begin() const noexcept { return const_iterator{_b()};}
+  const_iterator cbegin() const noexcept { return const_iterator{_b()};} 
 
   // define end iterators
   iterator end() noexcept { return iterator{nullptr}; }
@@ -104,25 +86,9 @@ public:
     return tmp; 
   }
 
-  iterator last() noexcept {
-    auto tmp = head.get();
-    while (tmp->right)
-      tmp = tmp->right.get();
-    return iterator{tmp}; 
-  }
-
-  const_iterator last() const noexcept {
-    auto tmp = head.get();
-    while (tmp->right)
-      tmp = tmp->right.get();
-    return const_iterator{tmp}; 
-  }
-  const_iterator clast() const noexcept {
-    auto tmp = head.get();
-    while (tmp->right)
-      tmp = tmp->right.get();
-    return const_iterator{tmp}; 
-  }
+  iterator last() noexcept { return iterator{_last()};}
+  const_iterator last() const noexcept { return const_iterator{_last()};}
+  const_iterator clast() const noexcept { return const_iterator{_last()};} 
 
 // ===============================================================
 //   insert
