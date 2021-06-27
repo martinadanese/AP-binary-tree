@@ -1,7 +1,7 @@
 SRC = binary_tree.cpp
 
 CXX = c++
-CXXFLAGS = -Wall -Wextra -g -std=c++11
+CXXFLAGS = -Wall -Wextra -g -std=c++14
 
 EXE = $(SRC:.cpp=.x)
 
