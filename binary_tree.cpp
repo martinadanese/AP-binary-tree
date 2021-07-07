@@ -4,30 +4,47 @@
 #include <memory>
 #include <iterator>
 #include <vector>
+//
+//
+// ===============================================================
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//   node
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// ===============================================================
+template <typename k_type, typename v_type>
+  struct _node{
+    std::pair<const k_type, v_type> pair;
+    std::unique_ptr<_node> right;
+    std::unique_ptr<_node> left;
+    _node* parent=nullptr;
+    
+    _node() noexcept = default; 
+    ~_node() noexcept = default;
+    
+    explicit _node(const std::pair<k_type, v_type>& p) 
+      : pair{p} {}
+    
+    explicit _node (std::pair<k_type, v_type>&& p) 
+      : pair{std::move(p)} {}
+    
+    //move semantics
+    _node(_node&& n) noexcept = default;
+    _node& operator=(_node&& n) noexcept = default;
+  };
 
+
+// ===============================================================
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//   bst
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// ===============================================================
 template <typename k_type, typename v_type,
           typename OP = std::less<k_type> >
 class bst{
 
+  using node = _node<const k_type,v_type>;
   OP op = OP{};
   
-  struct node{
-    std::pair<k_type,v_type> pair;
-    std::unique_ptr<node> right;
-    std::unique_ptr<node> left;
-    node* parent;
-    
-    node() noexcept = default; 
-    ~node() noexcept = default;
-    
-    explicit node(const std::pair<k_type, v_type>& p) 
-      {parent=nullptr; right=nullptr; left=nullptr;
-      pair=p; }
-    
-    explicit node(const std::pair<k_type, v_type>&& p) 
-      {parent = nullptr; right=nullptr; left=nullptr;
-      pair=std::move(p);}
-  };
 
   std::unique_ptr<node> head;  
   std::size_t _size{0};
@@ -49,8 +66,8 @@ public:
 
   template <typename O> 
   class _iterator;
-  using iterator = _iterator<node>;
-  using const_iterator = _iterator<const node>;
+  using iterator = _iterator<std::pair<const k_type,v_type>>;//<node>;
+  using const_iterator = _iterator<const std::pair<const k_type,v_type>>;//<const node>;
 
   /*
    * _b: to avoid code duplication
@@ -88,7 +105,6 @@ public:
 
   iterator last() noexcept { return iterator{_last()};}
   const_iterator last() const noexcept { return const_iterator{_last()};}
-  const_iterator clast() const noexcept { return const_iterator{_last()};} 
 
 // ===============================================================
 //   insert
@@ -100,6 +116,52 @@ public:
 
   template <typename O>
   std::pair<iterator,bool> _insert(O&& v) {
+    
+    auto _node = new node{std::forward<O>(v)};
+    auto tmp = head.get();
+    bool found=1;
+    _size++;
+
+
+    if (!tmp){
+      head.reset(_node);
+      return std::pair<iterator,bool>{ begin() , found };
+    }
+ 
+    while (tmp || tmp == head.get()  ) {
+      if (op(v.first, tmp->pair.first)) {
+          
+	  if (tmp->left)
+	    tmp = tmp->left.get();
+	  else {
+            _node->parent = tmp;
+	    tmp->left.reset(_node);
+            return std::pair<iterator,bool>{ iterator(_node) , found };
+	  }
+      }
+
+      else if (op(tmp->pair.first, v.first)) {
+
+	  if (tmp->right)
+	    tmp = tmp->right.get();
+	  else {
+            _node->parent = tmp;
+	    tmp->right.reset(_node);
+            return std::pair<iterator,bool>{ iterator(_node) , found };
+          }
+      }
+      else {
+        found = 0;
+        _size--;
+        return std::pair<iterator,bool>{ end() , found };  
+      }
+    }
+    
+    found = 0;
+    _size--;
+    return std::pair<iterator,bool>{ end() , found };  
+  }
+  /*std::pair<iterator,bool> _insert(O&& v) {
     auto _node = new node{std::forward<O>(v)};
     bool found=1;
     _size++;
@@ -159,6 +221,7 @@ public:
     return std::pair<iterator,bool> {pos,found};
     
   }
+  */
 // ===============================================================
 //   move and copy ctrs and assignments
 // ===============================================================
@@ -173,11 +236,11 @@ public:
       head.reset(_node);
       _size = b._size;
       for(const auto &x : b)
-	insert(x.pair);
+	insert(x);
       }
     }
   
-  bst& operator=(const bst& b){
+  bst operator=(const bst& b){
     head.reset();              
     auto tmp = b;              
     (*this) = std::move(tmp);  
@@ -193,7 +256,74 @@ public:
   /*
    * loop over all nodes until the desired one is found.
    */
+  /*
+  node* _find(node* next, const k_type& x) {
+    
+    if (!next)
+      return nullptr;
 
+    if (op(next->pair.first,x)){
+      next = next->right.get();
+      next = _find(next,x);
+      }
+    else if (op(x, head->pair.first)){
+      next = next->left.get();
+      next = _find(next,x);
+      }
+    
+     return next;
+  }
+*/
+  iterator find(const k_type& x) noexcept {   
+    
+    auto next = head.get();
+    while (next) {
+      if (op(next->pair.first, x))
+        next = next->right.get();
+      else if (op(x, next->pair.first))
+        next = next->left.get();
+      else if (!op(x, next->pair.first) && !op(next->pair.first, x))
+        return iterator(next);
+    }
+
+    //if not found
+    return iterator(end());
+  }
+
+// ===============================================================
+  const_iterator find(const k_type& x) const noexcept {   
+    
+    auto next = head.get();
+    while (next) {
+      if (op(next->pair.first, x))
+        next = next->right.get();
+      else if (op(x, next->pair.first))
+        next = next->left.get();
+      else if (!op(x, next->pair.first) && !op(next->pair.first, x))
+        return const_iterator(next);
+    }
+
+    //if not found
+    return iterator(end());
+  }
+
+// ===============================================================
+  node* _find(const k_type& x) noexcept {   
+    
+    auto next = head.get();
+    while (next) {
+      if (op(next->pair.first, x))
+        next = next->right.get();
+      else if (op(x, next->pair.first))
+        next = next->left.get();
+      else if (!op(x, next->pair.first) && !op(next->pair.first, x))
+        return next;
+    }
+
+    //if not found
+    return nullptr;
+  }
+/*
   iterator find(const k_type& x) noexcept {   
     auto first = begin();
     while(&(*first) != &(*end())) {
@@ -206,7 +336,6 @@ public:
     return end();
   }
 
-
   const_iterator find(const k_type& x) const noexcept {   
     auto first = begin();
     while(&(*first) != &(*end())) {
@@ -218,6 +347,7 @@ public:
     // if not found
     return end();
   }
+*/
 
 // ===============================================================
 //   emplace
@@ -251,7 +381,7 @@ public:
 
     std::vector<std::pair<k_type,v_type>> tmp;
     for (const auto &x : *this)
-      tmp.push_back(x.pair);
+      tmp.push_back(x);
     
     head.reset(nullptr);
 
@@ -284,53 +414,74 @@ public:
   * dered.
   *
  */
+ void _swap(node* a, node* b){
+   /*  
+   k_type tmp_k{std::move(a->pair.first)};
+   v_type tmp_v{std::move(a->pair.second)};
+   a->pair.first = std::move(b->pair.first);
+   a->pair.second = std::move(b->pair.second);
+   b->pair.first = std::move(tmp_k);
+   b->pair.second = std::move(tmp_v);
+   */
+   auto tmp{std::move(a)};
+   a= std::move(b);
+   b= std::move(tmp);
+ }
 
+// ===============================================================
  void erase(const k_type& x) noexcept {
    
-   auto to_remove = find(x);
-   if (!&(*to_remove)){
+   auto to_remove = _find(x);//ptr to node
+   auto e = end();
+   bool left;
+   if (to_remove == nullptr){
      std::cout << "no such value is present" << std::endl;
      return;}
-   auto successor = to_remove;
-   bool back=0;
-   if (&(*successor) == &(*last()))
-     back=1;
-   // search for a leaf -> no right or left child 
-   while (successor->right || successor->left){
-     
-     if (back)
-       successor--;
-     else{
-       successor++;
+   //auto tmp = to_remove;
+   
+   while(to_remove->left || to_remove->right){
+   //finché ha figli, vai a destra. Se non ha il nodo di destra, ma quello di sinistra, vai a sinistra
+     if (to_remove->right){
+       auto to_move = to_remove->right.get();
+       //swap pair
+       _swap(to_move, to_remove);
+       //change node to point
+       to_remove=std::move(to_move);
+       left =0;
        }
-     
-     // swap leaf and node
-     k_type tmp_k = (*to_remove).pair.first;
-     v_type tmp_v = (*to_remove).pair.second;
-     (*to_remove).pair.first = (*successor).pair.first;
-     (*to_remove).pair.second = (*successor).pair.second;
-     (*successor).pair.first = tmp_k;
-     (*successor).pair.second = tmp_v;
-       to_remove++;
-     }
-   
-   // identify if removing left or right child
-   if(successor->parent->left.get() == &(*successor))
-     successor->parent->left.reset();
-   else if(successor->parent->right.get() == &(*successor))
-     successor->parent->right.reset();
-   
+     else{ 
+       auto to_move = to_remove->left.get();
+       //swap pair
+       _swap(to_move, to_remove);
+       //change node to point
+       to_remove=std::move(to_move);
+       left =1;
+       }
+   }
+   if(left)
+     to_remove->parent->left.reset();
+   else
+     to_remove->parent->right.reset();
+
    _size = _size-1;
-   return;
+
+
+
+
+
+
+
+
+
 
    
  }
-
 
 // ===============================================================
 //   reverse print
 // ===============================================================
   
+/*
   void reverse_print() noexcept {
 
     auto it = last();
@@ -342,10 +493,38 @@ public:
 
   }
 
+*/
 // ===============================================================
 //   overloading
 // ===============================================================
   
+  //subscripting operator
+  v_type& operator[](const k_type& x) noexcept  {
+    auto it = find(x);
+    auto e = end();
+    //if ( it == end()){
+    if ( it == e){
+      v_type v = "inserted new value (iwso)";// inserted with subscripting operator
+      emplace(x,v);
+      it = find(x);
+    }
+    return it->second;
+  }
+
+// ===============================================================
+  
+  v_type& operator[](k_type& x) noexcept  {
+    auto it = find(x);
+    auto e = end();
+    if ( it == e){
+      v_type v = "inserted new value (iwso)";// inserted with subscripting operator
+      emplace(x,v);
+      it = find(x);
+    }
+    return it->second;
+  }
+  
+// ===============================================================
   friend
   // put-to operator
   std::ostream &operator<<(std::ostream &os, const bst& b) noexcept {
@@ -353,37 +532,9 @@ public:
       os << " ";
       return os;}
     for (const auto &x : b)
-      os << x.pair.first << " ";
+      os << x.first << " ";
     return os;
   }
-  
-// ===============================================================
-  
-  //subscripting operator
-  v_type& operator[](const k_type& x) noexcept  {
-    auto it = find(x);
-    if ( &(*it) == &(*end())){
-      v_type v = "inserted new value (iwso)";// inserted with subscripting operator
-      emplace(x,v);
-      it = find(x);
-    }
-    return (*it).pair.second;
-  }
-
-// ===============================================================
-  
-  //subscripting operator
-  v_type& operator[](k_type&& x) noexcept {
-    auto it = find(std::move(x));
-    if ( &(*it) == &(*end())){
-      v_type v = "inserted new value (iwso)";// inserted with subscripting operator
-      emplace(std::move(x),v);
-      it = find(std::move(x));
-    }
-    return (*it).pair.second;
-  }
-  
-
 };
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -403,15 +554,16 @@ public:
   node *current; // using node allows avoid typename (s 45)
 
   public:
-    using value_type = O;// O is a node
+    using value_type = O;// std::pair<O,T>; // O is a std::pair // 
     using reference = value_type&;
     using pointer = value_type*;
-    using difference_type = std::ptrdiff_t;
+    using difference_type = std::ptrdiff_t; 
     using iterator_category = std::bidirectional_iterator_tag;   //forward_iterator_tag;
-
+    // iterator ctr
     explicit _iterator(node *p) : current{p} {}
   
-    reference operator*() const { return *current; }// returns the ptr to the node
+    // const refers to itr itselft -> the status is not changed
+    reference operator*() const { return current->pair; }// when dereference I shall return pair
     pointer operator->() const { return &**this; }
     
     // pre-increment
@@ -545,8 +697,8 @@ int main(){
   
   std::cout << "\nCreating a BST, b.\n";
   bst<int,std::string> b;
-  std::cout << "\n--- inserting "<< p1.first <<" ---"  << std::endl;   
   p1.first = 8;
+  std::cout << "\n--- inserting "<< p1.first <<" ---"  << std::endl;   
   b.insert(p1);
   std::cout << "\nprinting b"  << std::endl;   
   std::cout << b << std::endl;
@@ -590,27 +742,23 @@ int main(){
   b.insert(p1);
   std::cout << "\nprinting b"  << std::endl;   
   std::cout << b << std::endl;
-
   std::cout << "=================================================================\n" ;
   std::cout << "\nTo show the property of the BST class \nin the following we exploit some options and modifications:\n";
 
   std::cout << "\ninserting 100,h with emplace, the result is:\n";
   b.emplace(100,"h");
   std::cout << b << std::endl;
-  
   std::cout << "\nprinting value of b[25], the result is:\n";
   std::cout << b[25] << std::endl;
   std::cout << b << std::endl;
   std::cout << "\nprinting value of b[100], the result is:\n";
   std::cout << b[100] << std::endl;
   
-  std::cout << "\nerasing 8 and 7, the result is:\n";
-  b.erase(8);
+  std::cout << "\nerasing 7, the result is:\n";
   b.erase(7);
   std::cout << b << std::endl;
-  
-  std::cout << "\nseraching for 100:\n";
-  auto result = b.find(100);
+  std::cout << "\nseraching for 13:\n";
+  auto result = b.find(13);
   auto bend = b.end();
   (result != bend)
      ? std::cout << "the BST contains the searched number\n"
@@ -626,8 +774,8 @@ int main(){
   b.balance();
   std::cout << b << std::endl;
   
-  std::cout << "\nprinting the tree in reversed order, the result is:\n";
-  b.reverse_print();
+  //std::cout << "\nprinting the tree in reversed order, the result is:\n";
+  //b.reverse_print();
  
   std::cout << "\n -------- \n";
   std::cout << "\nNow the tree is copied into a new one, b1. The result is:\n";
