@@ -127,12 +127,6 @@ The subscripting operator is overloaded in order to take a key as input and to
 print the corrsponding value, if present, or to insert that key in the bst if not
 present.
 
-### Benchmark
-The functions `find()` and `insert()` of the code were benchmarked, creating a bst of predefined size (x axis)
-and averaging 20 performances of the desired method for each bst size.
-
-![benchmark_find](https://user-images.githubusercontent.com/86531192/123562865-9aba0e80-d7b1-11eb-87de-c443135a7656.png)
-![benchmark_insert](https://user-images.githubusercontent.com/86531192/123562868-9db4ff00-d7b1-11eb-8635-add80fe8ce89.png)
 
 ## Python part
 
