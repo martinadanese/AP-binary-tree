@@ -197,7 +197,8 @@ public:
       auto _node = new node{b.head->pair, b.head.get()};
       head.reset(_node);
       _size = b._size;
-      /* questo crea una memory leak ma why?
+      // alternativa -> != linked list. Convenienza?
+     /* 
       for(const auto &x : b)
 	_insert(x);
       */
@@ -432,14 +433,14 @@ public:
         to_remove->parent->left->parent = to_remove->parent;
       }
     else {//if to remove is right child
-      auto tmp2 = to_remove->right.release();
-      std::cout << to_remove->parent->right.get() << std::endl;
-      std::cout << to_remove->parent << std::endl;
-      (to_remove->parent)->right.reset(tmp2);//std::make_unique<node>(*tmp2));
-      std::cout << to_remove->parent->right.get() << std::endl;
-      std::cout << to_remove->parent << std::endl;
+      //auto tmp2 = to_remove->right.release();
+      //std::cout << to_remove->parent->right.get() << std::endl;
+      //std::cout << to_remove->parent << std::endl;
+      //(to_remove->parent)->right.reset(tmp2);//std::make_unique<node>(*tmp2));
+      //std::cout << to_remove->parent->right.get() << std::endl;
+      //std::cout << to_remove->parent << std::endl;
 
- //     to_remove->parent->right.reset(to_remove->right.release());
+      to_remove->parent->right.reset(to_remove->right.release());
       if(to_remove->parent->right)//if it did not become a null ptr
         to_remove->parent->right->parent = to_remove->parent;
       //delete tmp2;
@@ -754,7 +755,7 @@ int main(){
   std::cout << "\nprinting value of b[100], the result is:\n";
   std::cout << b[100] << std::endl;
   
-  std::cout << "\nerasing 7 and 6, the result is:\n";
+  std::cout << "\nerasing 7, the result is:\n";
   b.erase(7);
   //b.erase(6);
   //b.erase(14);
@@ -783,7 +784,6 @@ int main(){
   std::cout << "\nNow the tree is copied into a new one, b1. The result is:\n";
   bst<int,std::string> b1{b};
   std::cout << b1 << std::endl;
-/*
   
   std::cout << "\nadding key 17 to b1 with the overloaded operator, the result is:\n";
   std::cout << b1[17] << std::endl;
@@ -802,6 +802,7 @@ int main(){
   std::cout << "\nFinally b2 is cleared:\n";
   b2.clear();
   std::cout << b2 << std::endl;
+/*
 */  
   return 0;
 }
