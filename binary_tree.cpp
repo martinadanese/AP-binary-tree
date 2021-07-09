@@ -13,9 +13,8 @@
 // ===============================================================
 template <typename k_type, typename v_type>
   struct _node{
-    using value_type = std::pair<const k_type, v_type>;
-    value_type pair;
-    //std::pair<k_type, v_type> pair;
+    using pair_type = std::pair<const k_type, v_type>;
+    pair_type pair;
     std::unique_ptr<_node> right;
     std::unique_ptr<_node> left;
     _node* parent=nullptr;
@@ -23,13 +22,13 @@ template <typename k_type, typename v_type>
     _node() noexcept = default; 
     ~_node() noexcept = default;
     
-    explicit _node(const std::pair<const k_type, v_type>& p) 
+    explicit _node(const pair_type& p) 
       : pair{p} {}
     
-    explicit _node (std::pair<const k_type, v_type>&& p) noexcept 
+    explicit _node (pair_type&& p) noexcept 
       : pair{std::move(p)} {}
     
-    _node(const std::pair<const k_type, v_type>& p, _node* nptr) noexcept 
+    _node(const pair_type& p, _node* nptr) noexcept 
       : pair{p} {
       if (nptr->left){
         left.reset(new _node(nptr->left->pair, nptr->left.get()));
@@ -40,16 +39,6 @@ template <typename k_type, typename v_type>
 	right->parent = this;
         }
       }
-/*
-    //fake move semantics to moves only the pair
-    explicit _node(_node&& n) noexcept 
-      : pair{std::move(n.pair)}{}
-
-    _node& operator=(_node&& n) noexcept {
-      pair = std::move(n.pair);
-      return *this;
-    }
-  */  
   };
 
 // ===============================================================
@@ -197,9 +186,9 @@ public:
 //   begin & end
 // ===============================================================
 
-  using iterator = _iterator<k_type, v_type, typename node::value_type>;//<node>;
+  using iterator = _iterator<k_type, v_type, typename node::pair_type>;//<node>;
   //using iterator = _iterator<std::pair<k_type,v_type>>;//<node>;
-  using const_iterator = _iterator<k_type, v_type, const typename node::value_type>;//<const node>;
+  using const_iterator = _iterator<k_type, v_type, const typename node::pair_type>;//<const node>;
   //using const_iterator = _iterator<const std::pair<k_type,v_type>>;//<const node>;
 
   /*
@@ -243,8 +232,8 @@ public:
 //   insert
 // ===============================================================
  
-  std::pair<iterator, bool> insert(const std::pair<k_type,v_type>& x) {return _insert(x);}
-  std::pair<iterator, bool> insert(std::pair<k_type,v_type>&& x) {return _insert(std::move(x));}
+  std::pair<iterator, bool> insert(const typename node::pair_type& x) {return _insert(x);}
+  std::pair<iterator, bool> insert(typename node::pair_type&& x) {return _insert(std::move(x));}
   
 
   template <typename O>
@@ -391,7 +380,7 @@ public:
      * again recursively splitting into half the vector.
      */
 
-    std::vector<std::pair<k_type,v_type>> tmp;
+    std::vector<typename node::pair_type> tmp;
     for (const auto &x : *this)
       tmp.push_back(x);
     
@@ -404,7 +393,7 @@ public:
 
 // ===============================================================
   
-  void _balance(std::vector<std::pair<k_type,v_type>>& tmp, std::size_t sidx, std::size_t eidx) noexcept {
+  void _balance(std::vector<typename node::pair_type>& tmp, std::size_t sidx, std::size_t eidx) noexcept {
     
     _insert(tmp[(eidx+sidx)/2]);
     
@@ -419,51 +408,17 @@ public:
 //   erase
 // ===============================================================
  
- /*
-  * to erase a node, first we swap it with its successor
-  * repeatedly until a leaves level is found. If the node 
-  * of interest is the last one, the predecessor is consi-
-  * dered.
-  *
- */
- 
-   /*
- void _swap(node* a, node* b) noexcept {
-   
-   k_type tmp_k{std::move(a->pair.first)};
-   v_type tmp_v{std::move(a->pair.second)};
-   a->pair.first = std::move(b->pair.first);
-   a->pair.second = std::move(b->pair.second);
-   b->pair.first = std::move(tmp_k);
-   b->pair.second = std::move(tmp_v);
-
-   std::pair<k_type, v_type> tmp{std::move(a->pair)};
-   a->pair = std::move(b->pair);
-   b->pair = std::move(tmp);
-  
-  //--------------------------
-   auto tmp{std::move(*a)};
-   //auto tmp = *a;
-   *a = std::move(*b);
-   *b = std::move(tmp);
-
- }
-   */
- 
-
-// ===============================================================
- 
 
   void erase(const k_type& x) noexcept {
     auto to_remove = _find(x);//ptr to node
     bool left=0;
-    std::vector<std::pair<k_type,v_type>> tmp;
+    std::vector<typename node::pair_type> tmp;
     auto it = iterator(to_remove);
     auto e = end();
    
-    //check i!=end()
-    if (it == end())
-      return;
+    if (it == end()){
+      std::cout << "the value is not present" << std::endl;
+      return;}
 
     //head
     if (to_remove == head.get()){
@@ -481,7 +436,7 @@ public:
 
 
     // if not the head
-    if(to_remove->parent->left.get() == to_remove)//if to remove is left child
+    if(to_remove->parent->left.get() == to_remove)
       left=1;
 
     if (left){
@@ -512,18 +467,11 @@ public:
         par->left->parent = par;
       }
     else {//if to remove is right child
-      //auto tmp2 = to_remove->right.release();
-      //std::cout << to_remove->parent->right.get() << std::endl;
-      //std::cout << to_remove->parent << std::endl;
-      //(to_remove->parent)->right.reset(tmp2);//std::make_unique<node>(*tmp2));
-      //std::cout << to_remove->parent->right.get() << std::endl;
-      //std::cout << to_remove->parent << std::endl;
+      // use par to avoid dangling pointers
       auto par = to_remove->parent;
       par->right.reset(to_remove->right.release());
       if(par->right)//if it did not become a null ptr
         par->right->parent = par;
-      //delete tmp2;
-      //delete tmp3;
     }
 
     for (auto &&x : tmp)
