@@ -11,6 +11,7 @@
 //   node
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 // ===============================================================
+
 template <typename k_type, typename v_type>
   struct _node{
     using pair_type = std::pair<const k_type, v_type>;
@@ -47,12 +48,11 @@ template <typename k_type, typename v_type>
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 // ===============================================================
 
-  //oppure node_type e no linea 64
   template <typename k_type, typename v_type, typename O> 
   class _iterator
   {
   using node = _node<k_type,v_type>;
-  node *current; // using node allows avoid typename (s 45)
+  node *current; 
 
   public:
     using value_type = O;// std::pair<O,T>; // O is a std::pair // 
@@ -63,7 +63,6 @@ template <typename k_type, typename v_type>
     // iterator ctr
     explicit _iterator(node *p) noexcept: current{p} {}
   
-    // const refers to itr itselft -> the status is not changed
     reference operator*() const noexcept { return current->pair; }// when dereference I shall return pair
     pointer operator->() const noexcept{ return &**this; }
     
@@ -165,8 +164,8 @@ template <typename k_type, typename v_type,
           typename OP = std::less<k_type> >
 class bst{
 
-  using node = _node<k_type,v_type>;//const è effettivamente ripetitivo
-  //using node = _node<k_type,v_type>
+  using node = _node<k_type,v_type>;
+  using p_type = typename node::pair_type;// = p_t;
   OP op = OP{};
   std::unique_ptr<node> head;  
   std::size_t _size{0};
@@ -186,10 +185,8 @@ public:
 //   begin & end
 // ===============================================================
 
-  using iterator = _iterator<k_type, v_type, typename node::pair_type>;//<node>;
-  //using iterator = _iterator<std::pair<k_type,v_type>>;//<node>;
-  using const_iterator = _iterator<k_type, v_type, const typename node::pair_type>;//<const node>;
-  //using const_iterator = _iterator<const std::pair<k_type,v_type>>;//<const node>;
+  using iterator = _iterator<k_type, v_type, p_type>;
+  using const_iterator = _iterator<k_type, v_type, const p_type>;
 
   /*
    * _b: to avoid code duplication
@@ -232,8 +229,8 @@ public:
 //   insert
 // ===============================================================
  
-  std::pair<iterator, bool> insert(const typename node::pair_type& x) {return _insert(x);}
-  std::pair<iterator, bool> insert(typename node::pair_type&& x) {return _insert(std::move(x));}
+  std::pair<iterator, bool> insert(const p_type& x) {return _insert(x);}
+  std::pair<iterator, bool> insert(p_type&& x) {return _insert(std::move(x));}
   
 
   template <typename O>
@@ -294,19 +291,16 @@ public:
   bst& operator=(bst&&) noexcept = default;
 
 
+// ===============================================================
   bst(const bst& b){
     if (b.head) {
       auto _node = new node{b.head->pair, b.head.get()};
       head.reset(_node);
       _size = b._size;
-      // alternativa -> != linked list. Convenienza?
-     /* 
-      for(const auto &x : b)
-	_insert(x);
-      */
       }
     }
   
+// ===============================================================
   bst operator=(const bst& b){
     head.reset();              
     auto tmp = b;              
@@ -394,7 +388,10 @@ public:
 // ===============================================================
   
   void _balance(std::vector<typename node::pair_type>& tmp, std::size_t sidx, std::size_t eidx) noexcept {
-    
+   
+    if (eidx == sidx)
+      return;
+
     _insert(tmp[(eidx+sidx)/2]);
     
     if ((eidx+sidx)/2 != sidx)
@@ -410,115 +407,54 @@ public:
  
 
   void erase(const k_type& x) noexcept {
-    auto to_remove = _find(x);//ptr to node
+    node* to_remove = _find(x);
     bool left=0;
     std::vector<typename node::pair_type> tmp;
     auto it = iterator(to_remove);
-    auto e = end();
    
     if (it == end()){
       std::cout << "the value is not present" << std::endl;
       return;}
 
-    //head
-    if (to_remove == head.get()){
-      ++it;
-      while (it != e){
-	tmp.push_back(*it);
-        ++it;}
-      
-      head.reset(head->left.release());
-      head->parent=nullptr;
-      for (auto &&x : tmp)
-        _insert(x);
-      return;
-    }
-
-
-    // if not the head
-    if(to_remove->parent->left.get() == to_remove)
+    if(to_remove == head.get() || to_remove->parent->left.get() == to_remove)
       left=1;
 
     if (left){
       ++it;
-      //append the whole right branch of node to_remove to a std::vector
-      //the right branch will be identified as the one between to_remove 
-      //and its parents bc of bst properties
-      //while (it != iterator(to_remove->parent)){
-      while (op(it->first, to_remove->parent->pair.first) && to_remove->right){
+      //right branch (between to_remove and parent) removed and reinsered after.
+      while (it != iterator(to_remove->parent)){
 	tmp.push_back(*it);
         ++it;}
     }
     else {
       --it;
-      //append the whole left branch of node to_remove to a std::vector
-      //the left branch will be identified as the one between to_remove 
-      //and its parents bc of bst properties
-      while (op(to_remove->parent->pair.first, it->first) && to_remove->left){
+      //left branch (between to_remove and parent) removed and reinsered after.
+      while (it != iterator(to_remove->parent)){
         tmp.push_back(*it);
         --it;}
     }
 
 
-    if(left) {//(to_remove->parent->left.get() == to_remove)//if to remove is left child
-      auto par = to_remove->parent;
-      par->left.reset(to_remove->left.release());
-      if(par->left)//if it did not become a null ptr
-        par->left->parent = par;
+    if(left) {
+      if(to_remove == head.get() ){
+        head.reset(head->left.release());
+        head->parent=nullptr;}
+      else{
+        auto par = to_remove->parent;
+        par->left.reset(to_remove->left.release());
+        if(par->left)
+          par->left->parent = par;}
       }
-    else {//if to remove is right child
-      // use par to avoid dangling pointers
+    else {
       auto par = to_remove->parent;
       par->right.reset(to_remove->right.release());
-      if(par->right)//if it did not become a null ptr
+      if(par->right)
         par->right->parent = par;
     }
 
-    for (auto &&x : tmp)
-      _insert(std::move(x));
+    // use _balance to insert values in a balanced way
+    _balance(tmp, 0, tmp.size());
   }
- /*
-
- void erase(const k_type& x) noexcept {
-   
-   auto to_remove = _find(x);//ptr to node
-   auto to_move = to_remove;
-   bool left;
-   if (to_remove == nullptr){
-     std::cout << "no such value is present" << std::endl;
-     return;}
-   //auto tmp = to_remove;
-   
-   while(to_remove->left || to_remove->right){
-   //finché ha figli, vai a destra. Se non ha il nodo di destra, ma quello di sinistra, vai a sinistra
-     if (to_remove->right){
-       to_move = to_remove->right.get();
-       //swap pair
-       _swap(to_move, to_remove);
-       //change node to point
-       to_remove = to_move;
-       left =0;
-       }
-     else{ 
-       to_move = to_remove->left.get();
-       //swap pair
-       _swap(to_move, to_remove);
-       //change node to point
-       to_remove = to_move;
-       left =1;
-       }
-   }
-   if(to_remove->parent->left.get() == to_remove)
-     to_remove->parent->left.reset();
-   else
-     to_remove->parent->right.reset();
-
-   _size = _size-1;
-
-   
- }
-
-   */
 
 // ===============================================================
 //   overloading
@@ -527,10 +463,8 @@ public:
   //subscripting operator
   v_type& operator[](const k_type& x) noexcept  {
     auto it = find(x);
-    auto e = end();
-    //if ( it == end()){
-    if ( it == e){
-      v_type v = "inserted new value (iwso)";// inserted with subscripting operator
+    if ( it == end()){
+      v_type v = "inserted new value with [] operator";
       emplace(x,v);
       it = find(x);
     }
@@ -541,9 +475,8 @@ public:
   
   v_type& operator[](k_type& x) noexcept  {
     auto it = find(x);
-    auto e = end();
-    if ( it == e){
-      v_type v = "inserted new value (iwso)";// inserted with subscripting operator
+    if ( it == end()){
+      v_type v = "inserted new value with [] operator";
       emplace(x,v);
       it = find(x);
     }
@@ -579,7 +512,7 @@ int main(){
   std::cout << "       _ _\n" ;
   std::cout << "    /~~   ~~\\           Code for Binary Search Trees \n" ;
   std::cout << " /~~         ~~\\          \n";
-  std::cout << "{    ~~         }               by M.Danese\n";
+  std::cout << "{    ~~         }               \n";
   std::cout << " \\__     ~~  __/\n";
   std::cout << "    ~~\\   /~~  \n";
   std::cout << "       | |     \n";
@@ -608,49 +541,40 @@ int main(){
   std::cout << "\nCreating a BST, b.\n";
   bst<int,std::string> b;
   p1.first = 8;
-  std::cout << "\n--- inserting "<< p1.first <<" ---"  << std::endl;   
+  std::cout << "inserting "<< p1.first <<"  :  " ;   
   b.insert(p1);
-  std::cout << "\nprinting b"  << std::endl;   
   std::cout << b << std::endl;
   p1.first = 3;
-  std::cout << "\n--- inserting "<< p1.first <<" ---"  << std::endl;   
+  std::cout << "inserting "<< p1.first <<"  :  " ;   
   b.insert(p1);
-  std::cout << "\nprinting b"  << std::endl;   
   std::cout << b << std::endl;
   p1.first = 10;
-  std::cout << "\n--- inserting "<< p1.first <<" ---"  << std::endl;   
+  std::cout << "inserting "<< p1.first <<" :  " ;   
   b.insert(p1);
-  std::cout << "\nprinting b"  << std::endl;   
   std::cout << b << std::endl;
   p1.first = 1;
-  std::cout << "\n--- inserting "<< p1.first <<" ---"  << std::endl;   
+  std::cout << "inserting "<< p1.first <<"  :  " ;   
   b.insert(p1);
-  std::cout << "\nprinting b"  << std::endl;   
   std::cout << b << std::endl;
   p1.first = 6;
-  std::cout << "\n--- inserting "<< p1.first <<" ---"  << std::endl;   
+  std::cout << "inserting "<< p1.first <<"  :  " ;   
   b.insert(p1);
-  std::cout << "\nprinting b"  << std::endl;   
   std::cout << b << std::endl;
   p1.first = 4;
-  std::cout << "\n--- inserting "<< p1.first <<" ---"  << std::endl;   
+  std::cout << "inserting "<< p1.first <<"  :  " ;   
   b.insert(p1);
-  std::cout << "\nprinting b"  << std::endl;   
   std::cout << b << std::endl;
   p1.first = 7;
-  std::cout << "\n--- inserting "<< p1.first <<" ---"  << std::endl;   
+  std::cout << "inserting "<< p1.first <<"  :  " ;   
   b.insert(p1);
-  std::cout << "\nprinting b"  << std::endl;   
   std::cout << b << std::endl;
   p1.first = 14;
-  std::cout << "\n--- inserting "<< p1.first <<" ---"  << std::endl;   
+  std::cout << "inserting "<< p1.first <<" :  " ;   
   b.insert(p1);
-  std::cout << "\nprinting b"  << std::endl;   
   std::cout << b << std::endl;
   p1.first = 13;
-  std::cout << "\n--- inserting "<< p1.first <<" ---"  << std::endl;   
+  std::cout << "inserting "<< p1.first <<" :  " ;   
   b.insert(p1);
-  std::cout << "\nprinting b"  << std::endl;   
   std::cout << b << std::endl;
   std::cout << "=================================================================\n" ;
   std::cout << "\nTo show the property of the BST class \nin the following we exploit some options and modifications:\n";
@@ -663,10 +587,10 @@ int main(){
   std::cout << "\nprinting value of b[100], the result is:\n";
   std::cout << b[100] << std::endl;
   
-  std::cout << "\nerasing 7, the result is:\n";
-  b.erase(7);
-  //b.erase(6);
-  //b.erase(14);
+  std::cout << "\nerasing 8, 6 and 14, the result is:\n";
+  b.erase(14);
+  b.erase(6);
+  b.erase(8);
   std::cout << b << std::endl;
   std::cout << "\nseraching for 13:\n";
   auto result = b.find(13);
@@ -685,9 +609,6 @@ int main(){
   b.balance();
   std::cout << b << std::endl;
   
-  //std::cout << "\nprinting the tree in reversed order, the result is:\n";
-  //b.reverse_print();
- 
   std::cout << "\n -------- \n";
   std::cout << "\nNow the tree is copied into a new one, b1. The result is:\n";
   bst<int,std::string> b1{b};
@@ -710,7 +631,4 @@ int main(){
   std::cout << "\nFinally b2 is cleared:\n";
   b2.clear();
   std::cout << b2 << std::endl;
-/*
-*/  
-  return 0;
 }
