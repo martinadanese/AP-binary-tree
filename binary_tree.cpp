@@ -13,7 +13,8 @@
 // ===============================================================
 template <typename k_type, typename v_type>
   struct _node{
-    std::pair<const k_type, v_type> pair;
+    using value_type = std::pair<const k_type, v_type>;
+    value_type pair;
     //std::pair<k_type, v_type> pair;
     std::unique_ptr<_node> right;
     std::unique_ptr<_node> left;
@@ -22,13 +23,13 @@ template <typename k_type, typename v_type>
     _node() noexcept = default; 
     ~_node() noexcept = default;
     
-    explicit _node(const std::pair<k_type, v_type>& p) 
+    explicit _node(const std::pair<const k_type, v_type>& p) 
       : pair{p} {}
     
-    explicit _node (std::pair<k_type, v_type>&& p) noexcept 
+    explicit _node (std::pair<const k_type, v_type>&& p) noexcept 
       : pair{std::move(p)} {}
     
-    _node(const std::pair<k_type, v_type>& p, _node* nptr) 
+    _node(const std::pair<const k_type, v_type>& p, _node* nptr) noexcept 
       : pair{p} {
       if (nptr->left){
         left.reset(new _node(nptr->left->pair, nptr->left.get()));
@@ -39,7 +40,7 @@ template <typename k_type, typename v_type>
 	right->parent = this;
         }
       }
-
+/*
     //fake move semantics to moves only the pair
     explicit _node(_node&& n) noexcept 
       : pair{std::move(n.pair)}{}
@@ -48,9 +49,123 @@ template <typename k_type, typename v_type>
       pair = std::move(n.pair);
       return *this;
     }
-    
+  */  
   };
 
+// ===============================================================
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//   iterator
+// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+// ===============================================================
+
+  //oppure node_type e no linea 64
+  template <typename k_type, typename v_type, typename O> 
+  class _iterator
+  {
+  using node = _node<k_type,v_type>;
+  node *current; // using node allows avoid typename (s 45)
+
+  public:
+    using value_type = O;// std::pair<O,T>; // O is a std::pair // 
+    using reference = value_type&;
+    using pointer = value_type*;
+    using difference_type = std::ptrdiff_t; 
+    using iterator_category = std::bidirectional_iterator_tag;   //forward_iterator_tag;
+    // iterator ctr
+    explicit _iterator(node *p) noexcept: current{p} {}
+  
+    // const refers to itr itselft -> the status is not changed
+    reference operator*() const noexcept { return current->pair; }// when dereference I shall return pair
+    pointer operator->() const noexcept{ return &**this; }
+    
+    // pre-increment
+    _iterator &operator++() noexcept{
+      
+      // check if there are sub-right trees
+      if (current->right){
+        
+	current = current->right.get();
+	while(current->left){
+	  current = current->left.get();
+        }
+
+      } else {// go up and use the parent only if coming from right
+        
+	auto tmp_p = current->parent;
+	
+	if (!tmp_p){//if node is null ptr the end is reached and must return 
+	  current = tmp_p;
+	  return *this;
+	  }
+	  
+        
+
+	while (tmp_p->parent && (tmp_p->right.get() == current)) {
+	  current = tmp_p;
+	  tmp_p = tmp_p->parent;
+	  }
+	if( tmp_p->right.get() == current) 
+	  tmp_p = tmp_p->parent;
+	
+	current = tmp_p;
+      }
+      return *this;
+    }
+    
+    // post-increment
+    _iterator operator++(int) {
+      auto tmp{*this};
+      ++(*this);
+      return tmp;
+    }
+
+
+    _iterator &operator--() {
+      
+      // check if there are sub-right trees
+      if (current->left){
+        
+	current = current->left.get();
+	while(current->right){
+	  current = current->right.get();
+        }
+
+      } else {// go up and use the parent only if coming from right
+        
+	auto tmp_p = current->parent;
+	
+	if (!tmp_p){//if node is null ptr the end is reached and must return 
+	  current = tmp_p;
+	  return *this;
+	  }
+	  
+        
+
+	while (tmp_p->parent && (tmp_p->left.get() == current)) {
+	  current = tmp_p;
+	  tmp_p = tmp_p->parent;
+	  }
+	if( tmp_p->left.get() == current) 
+	  tmp_p = tmp_p->parent;
+	
+	current = tmp_p;
+      }
+      return *this;
+    }
+
+    _iterator operator--(int) {
+      auto tmp{*this};
+      --(*this);
+      return tmp;
+    }
+    // fine because comparing the pointers, not the keys
+    friend bool operator==(const _iterator &a, const _iterator &b) {
+      return (a.current == b.current);
+    }
+    friend bool operator!=(const _iterator &a, const _iterator &b) { 
+      return !(a == b); /// !!! era forward
+    }
+};
 
 // ===============================================================
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -61,8 +176,8 @@ template <typename k_type, typename v_type,
           typename OP = std::less<k_type> >
 class bst{
 
-  using node = _node<const k_type,v_type>;
-  //using node = _node<k_type,v_type>;
+  using node = _node<k_type,v_type>;//const è effettivamente ripetitivo
+  //using node = _node<k_type,v_type>
   OP op = OP{};
   std::unique_ptr<node> head;  
   std::size_t _size{0};
@@ -82,11 +197,9 @@ public:
 //   begin & end
 // ===============================================================
 
-  template <typename O> 
-  class _iterator;
-  using iterator = _iterator<std::pair<const k_type,v_type>>;//<node>;
+  using iterator = _iterator<k_type, v_type, typename node::value_type>;//<node>;
   //using iterator = _iterator<std::pair<k_type,v_type>>;//<node>;
-  using const_iterator = _iterator<const std::pair<const k_type,v_type>>;//<const node>;
+  using const_iterator = _iterator<k_type, v_type, const typename node::value_type>;//<const node>;
   //using const_iterator = _iterator<const std::pair<k_type,v_type>>;//<const node>;
 
   /*
@@ -222,54 +335,15 @@ public:
    * loop over all nodes until the desired one is found.
    */
   iterator find(const k_type& x) noexcept {   
-    
-    auto next = head.get();
-    while (next) {
-      if (op(next->pair.first, x))
-        next = next->right.get();
-      else if (op(x, next->pair.first))
-        next = next->left.get();
-      else if (!op(x, next->pair.first) && !op(next->pair.first, x))
-        return iterator(next);
-    }
-
-    //if not found
-    return iterator(end());
+    return iterator{_find(x)};  
   }
 
 // ===============================================================
   const_iterator find(const k_type& x) const noexcept {   
     
-    auto next = head.get();
-    while (next) {
-      if (op(next->pair.first, x))
-        next = next->right.get();
-      else if (op(x, next->pair.first))
-        next = next->left.get();
-      else if (!op(x, next->pair.first) && !op(next->pair.first, x))
-        return const_iterator(next);
-    }
-
-    //if not found
-    return iterator(end());
+    return const_iterator{_find(x)};
   }
 
-// ===============================================================
-  node* _find(const k_type& x) noexcept {   
-    
-    auto next = head.get();
-    while (next) {
-      if (op(next->pair.first, x))
-        next = next->right.get();
-      else if (op(x, next->pair.first))
-        next = next->left.get();
-      else if (!op(x, next->pair.first) && !op(next->pair.first, x))
-        return next;
-    }
-
-    //if not found
-    return nullptr;
-  }
 // ===============================================================
   node* _find(const k_type& x) const noexcept {   
     
@@ -354,7 +428,7 @@ public:
  */
  
    /*
- void _swap(node* a, node* b){
+ void _swap(node* a, node* b) noexcept {
    
    k_type tmp_k{std::move(a->pair.first)};
    v_type tmp_v{std::move(a->pair.second)};
@@ -385,18 +459,22 @@ public:
     bool left=0;
     std::vector<std::pair<k_type,v_type>> tmp;
     auto it = iterator(to_remove);
-    
+    auto e = end();
+   
+    //check i!=end()
+    if (it == end())
+      return;
+
     //head
     if (to_remove == head.get()){
-      auto e = end();
-      it++;
+      ++it;
       while (it != e){
 	tmp.push_back(*it);
-        it++;}
+        ++it;}
       
       head.reset(head->left.release());
       head->parent=nullptr;
-      for (const auto &x : tmp)
+      for (auto &&x : tmp)
         _insert(x);
       return;
     }
@@ -407,30 +485,31 @@ public:
       left=1;
 
     if (left){
-      it++;
+      ++it;
       //append the whole right branch of node to_remove to a std::vector
       //the right branch will be identified as the one between to_remove 
       //and its parents bc of bst properties
       //while (it != iterator(to_remove->parent)){
       while (op(it->first, to_remove->parent->pair.first) && to_remove->right){
 	tmp.push_back(*it);
-        it++;}
+        ++it;}
     }
     else {
-      it--;
+      --it;
       //append the whole left branch of node to_remove to a std::vector
       //the left branch will be identified as the one between to_remove 
       //and its parents bc of bst properties
       while (op(to_remove->parent->pair.first, it->first) && to_remove->left){
         tmp.push_back(*it);
-        it--;}
+        --it;}
     }
 
 
     if(left) {//(to_remove->parent->left.get() == to_remove)//if to remove is left child
-      to_remove->parent->left.reset(to_remove->left.release());
-      if(to_remove->parent->left)//if it did not become a null ptr
-        to_remove->parent->left->parent = to_remove->parent;
+      auto par = to_remove->parent;
+      par->left.reset(to_remove->left.release());
+      if(par->left)//if it did not become a null ptr
+        par->left->parent = par;
       }
     else {//if to remove is right child
       //auto tmp2 = to_remove->right.release();
@@ -439,16 +518,16 @@ public:
       //(to_remove->parent)->right.reset(tmp2);//std::make_unique<node>(*tmp2));
       //std::cout << to_remove->parent->right.get() << std::endl;
       //std::cout << to_remove->parent << std::endl;
-
-      to_remove->parent->right.reset(to_remove->right.release());
-      if(to_remove->parent->right)//if it did not become a null ptr
-        to_remove->parent->right->parent = to_remove->parent;
+      auto par = to_remove->parent;
+      par->right.reset(to_remove->right.release());
+      if(par->right)//if it did not become a null ptr
+        par->right->parent = par;
       //delete tmp2;
       //delete tmp3;
     }
 
-    for (const auto &x : tmp)
-      _insert(x);
+    for (auto &&x : tmp)
+      _insert(std::move(x));
   }
  /*
 
@@ -540,125 +619,6 @@ public:
 
 
 
-// ===============================================================
-//   iterator
-// ===============================================================
-
-  template <typename k_type, typename v_type,
-            typename OP >
-  template <typename O> 
-  class bst<k_type,v_type,OP>::_iterator
-  {
-  using node = typename bst<k_type,v_type,OP>::node;
-  node *current; // using node allows avoid typename (s 45)
-
-  public:
-    using value_type = O;// std::pair<O,T>; // O is a std::pair // 
-    using reference = value_type&;
-    using pointer = value_type*;
-    using difference_type = std::ptrdiff_t; 
-    using iterator_category = std::bidirectional_iterator_tag;   //forward_iterator_tag;
-    // iterator ctr
-    explicit _iterator(node *p) : current{p} {}
-  
-    // const refers to itr itselft -> the status is not changed
-    reference operator*() const { return current->pair; }// when dereference I shall return pair
-    pointer operator->() const { return &**this; }
-    
-    // pre-increment
-    _iterator &operator++() {
-      
-      // check if there are sub-right trees
-      if (current->right){
-        
-	current = current->right.get();
-	while(current->left){
-	  current = current->left.get();
-        }
-
-      } else {// go up and use the parent only if coming from right
-        
-	auto tmp_p = current->parent;
-	
-	if (!tmp_p){//if node is null ptr the end is reached and must return 
-	  current = tmp_p;
-	  return *this;
-	  }
-	  
-        
-
-	while (tmp_p->parent && tmp_p->right.get() == current) {
-	  current = tmp_p;
-	  tmp_p = tmp_p->parent;
-	  }
-	if( tmp_p->right.get() == current) 
-	  tmp_p = tmp_p->parent;
-	
-	current = tmp_p;
-      }
-      return *this;
-    }
-    
-    // post-increment
-    _iterator operator++(int) {
-      auto tmp{*this};
-      ++(*this);
-      return tmp;
-    }
-
-
-    _iterator &operator--() {
-      
-      // check if there are sub-right trees
-      if (current->left){
-        
-	current = current->left.get();
-	while(current->right){
-	  current = current->right.get();
-        }
-
-      } else {// go up and use the parent only if coming from right
-        
-	auto tmp_p = current->parent;
-	
-	if (!tmp_p){//if node is null ptr the end is reached and must return 
-	  current = tmp_p;
-	  return *this;
-	  }
-	  
-        
-
-	while (tmp_p->parent && tmp_p->left.get() == current) {
-	  current = tmp_p;
-	  tmp_p = tmp_p->parent;
-	  }
-	if( tmp_p->left.get() == current) 
-	  tmp_p = tmp_p->parent;
-	
-	current = tmp_p;
-      }
-      return *this;
-    }
-
-    _iterator operator--(int) {
-      auto tmp{*this};
-      --(*this);
-      return tmp;
-    }
-    // fine because comparing the pointers, not the keys
-    friend bool operator==(_iterator &a, _iterator &b) {
-      return (a.current == b.current);
-    }
-    friend bool operator==(_iterator&& a, _iterator&& b) {
-      return (a.current == b.current);
-    }
-    friend bool operator!=(_iterator &a, _iterator &b) { 
-      return !(a == b);
-    }
-    friend bool operator!=(_iterator &&a, _iterator &&b) { 
-      return !(a == b);
-    }
-};
 
 // ===============================================================
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
