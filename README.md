@@ -5,14 +5,14 @@ Repo for Advanced Programming final project
 
 This part consists of the implementation of a template binary search tree (bst). The classes implemented are:
 
-- `bst<k_type,v_type,OP>` which defines a pointer to the root of the bst (`head`), 
+- `bst<const k_type,v_type,OP>` which defines a pointer to the root of the bst (`head`), 
 the comparison operator (`op`), which is used to compare two keys (`std::less<k_type`>is set as 
 default choice, and the number of nodes present in the tree (`_size`).
 
-- `node`, a structure that describes a node in the bst. It has a `std::pair<k_type,v_type>` pair, two 
-`std::unique_ptr<node>` pointing towards left and right child and a pointer to the parent node.
+- `node`, a structure that describes a node in the bst. It has a `std::pair<const k_type,v_type>` pair, two 
+`std::unique_ptr<node>` pointing towards left and right child and a raw pointer to the parent node.
 
-- `_iterator` that implements a bidirectional iterator templaten on the node.
+- `_iterator` that implements a bidirectional iterator templated on the bst pair.
 
 ### constructors and member functions
 
@@ -44,23 +44,19 @@ rely on the utility:
 template <typename O>
 std::pair<iterator,bool> _insert(O&& v) {
 ```
-that actually implements the insertion. Given a new pair, a loop is performed over the bst,
-until an element with a key bigger than the one to be inserted is found. If free, the new elements 
-becomes the left child of the identified node, otherwise it becomes the right child of the node with 
-no right child that
-has the greatest key among those with a key smaller than the new node.
-Repetitions are avoided.
+which implements the insertion. Given a new pair, the tree is vertically crossed with O(log(n)) complexity,
+until a free spot is found.
 
 #### move and copy semantics
 move constructor and assignment are the default ones, while copy constructor and assignment are
-implemented to perform a deep copy of the bsty.
+implemented to perform a deep copy of the bst.
 
 
 
 #### find()
 
-Loop over the bst until the target key is found. In case there is no such value, they return a null
-pointer
+Vertically loops over the bst until the target key is found with O(log(n)) complexity. In case there is no such value, they return a null
+pointer. Relies on the `_find` utility, which returns a raw pointer to the node.
 
 ```
 iterator find(const k_type& x) noexcept
@@ -106,19 +102,11 @@ void balance() noexcept
 
 
 #### erase()
-to erase a node, first it is swapped with its successor
-repeatedly until a leaves level is found. If the node
-of interest is the last one, the predecessor is usend
-instead of the successor.
+the one of the node branches is attached to the parent node while the other is
+re-insered exploiting the `_balance` utility.
 ```
 void erase(const k_type& x) noexcept {
 ```
-
-
-
-#### reverse_print()
-prints the bst backwards.
-
 
 
 #### operator overloading
