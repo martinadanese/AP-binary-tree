@@ -1,4 +1,4 @@
-# Binary Tree
+# AP-binary-tree
 Repo for Advanced Programming final project
 
 ## BST class
