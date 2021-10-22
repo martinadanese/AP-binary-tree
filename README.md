@@ -1,9 +1,9 @@
-# AP_project
+# Binary Tree
 Repo for Advanced Programming final project
 
-## C++ part
+## BST class
 
-This part consists of the implementation of a template binary search tree (bst). The classes implemented are:
+The classes implemented are:
 
 - `bst<const k_type,v_type,OP>` which defines a pointer to the root of the bst (`head`), 
 the comparison operator (`op`), which is used to compare two keys (`std::less<k_type`>is set as 
@@ -114,9 +114,4 @@ The put-to operator is overloaded on order to print the bst in the correct order
 The subscripting operator is overloaded in order to take a key as input and to
 print the corrsponding value, if present, or to insert that key in the bst if not
 present.
-
-
-## Python part
-
-A reverse dicrionary is created exploiting comprehensions.
 
